@@ -1,0 +1,113 @@
+---
+title: "Madison Common Council Advisory Referendum 2021"
+description: |
+  How precincts voted about the questions whether Madison Alder should be a full-time job and how long terms should be
+author:
+  - name: Harald Kliems 
+    orcid_id: 0000-0003-2542-0047
+    url: https://haraldkliems.netlify.app/
+date: "`r Sys.Date()`"
+repository_url: https://github.com/vgXhc/madison_referendum_2021
+compare_updates_url:
+creative_commons: CC BY-SA
+preview: screenshot_map.png
+output: 
+  distill::distill_article:
+    self_contained: false
+---
+
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+   echo=F, results=F, message=F, error=F, warning=F
+)
+```
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(tmap)
+library(sf)
+library(readxl)
+```
+
+```{r wards}
+# Ward shapefile from City of Madison OpenData portal
+wards <- read_sf("data/wards2021/Wards.shp")
+districts <- read_sf("data/districts/Aldermanic_Districts.shp")
+```
+Precincts with fewer than 25 total votes are not shown. Data: [Dane County Elections](https://elections.countyofdane.com/Precincts-Result/130/0261)
+
+
+# Should Alder be a full-time job?
+```{r}
+referendum <- read_excel("data/referendum_results.xlsx",
+                         skip = 7,
+                         col_names = c("precinct", "yes", "no"))
+
+referendum <- referendum %>% 
+  mutate(total = yes + no) %>% 
+  filter(total >= 25) %>% 
+  mutate(pct_yes = yes/total*100,
+         precinct = as.numeric(str_sub(precinct, -3)))
+
+results_joined <- wards %>% 
+  inner_join(referendum, by = c("WARD" = "precinct")) %>% 
+  filter(OBJECTID != 22143) %>% 
+  filter(OBJECTID != 22147) %>% #filtering the lakes
+  select(WARD, ALD_DIST, yes, no, total, pct_yes) %>% 
+  mutate(WARD = paste0("Ward ", WARD),
+         pct_yes_formatted = paste0(round(pct_yes, 1), "%"))
+
+```
+
+```{r results=T}
+tmap_mode("view")
+tm_shape(results_joined) +
+  tm_polygons("pct_yes",
+              palette = "Blues",
+          style = "jenks",
+          border.alpha = 0,
+          title = "In favor of full-time alders",
+          popup.vars = c("Alder district" = "ALD_DIST", "In favor" = "pct_yes_formatted", "Total votes cast" = "total"),
+          legend.format=list(fun=function(x) paste0(formatC(x, digits=0, format="f"), "%")))+
+  tm_shape(districts) +
+  tm_borders("black")
+```
+
+# Should terms for Alders be two or four years?
+
+```{r}
+referendum_ft <- read_excel("data/four-year-terms.xlsx",
+                         skip = 7,
+                         col_names = c("precinct", "yes", "no"))
+
+referendum_ft <- referendum_ft %>% 
+  mutate(total = yes + no) %>% 
+  filter(total >= 25) %>% 
+  mutate(pct_yes = yes/total*100,
+         precinct = as.numeric(str_sub(precinct, -3)))
+
+results_joined_ft <- wards %>% 
+  inner_join(referendum_ft, by = c("WARD" = "precinct")) %>% 
+  filter(OBJECTID != 22143) %>% 
+  filter(OBJECTID != 22147) %>% #filtering the lakes
+  select(WARD, ALD_DIST, yes, no, total, pct_yes) %>% 
+  mutate(WARD = paste0("Ward ", WARD),
+         pct_yes_formatted = paste0(round(pct_yes, 1), "%"))
+
+```
+
+```{r results=T}
+tm_shape(results_joined_ft) +
+  tm_polygons("pct_yes",
+          style = "jenks",
+          border.alpha = 0,
+          title = "In favor of four-year terms",
+          popup.vars = c("Alder district" = "ALD_DIST", "In favor" = "pct_yes_formatted", "Total votes cast" = "total"),
+          legend.format=list(fun=function(x) paste0(formatC(x, digits=0, format="f"), "%"))) +
+  tm_shape(districts) +
+  tm_borders("black")
+```
+
+
